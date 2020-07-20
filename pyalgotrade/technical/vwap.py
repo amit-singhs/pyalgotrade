@@ -26,6 +26,9 @@ class VWAPEventWindow(technical.EventWindow):
     def __init__(self, windowSize, useTypicalPrice):
         super(VWAPEventWindow, self).__init__(windowSize, dtype=object)
         self.__useTypicalPrice = useTypicalPrice
+        self.__cumTotal = 0    # cumulative total scope increased to class level
+        self.__cumVolume = 0   # cumulative volume scope increased to class level
+        self.__dateHolder = dt.datetime.now().date()  # new datetime variable, which will hold the date (YYYY-mm-dd) to be compared with bar in next iteration
 
     def getValue(self):
         ret = None
@@ -34,13 +37,23 @@ class VWAPEventWindow(technical.EventWindow):
             cumVolume = 0
 
             for bar in self.getValues():
+                if self.__dateHolder != bar.getDateTime().date() :   # if the date in dateHolder is not equal to date in the current bar
+                    self.__cumTotal = 0    # reset the cumulative total, so that anchor point of vwap is set to opening of new day
+                    self.__cumVolume = 0   # reset the cumulative volume also, so that anchor point of vwap is set to opening of new day
+                    self.__dateHolder = bar.getDateTime().date() # and finally replace the date in dateHolder variable with the date of the current bar
                 if self.__useTypicalPrice:
                     cumTotal += bar.getTypicalPrice() * bar.getVolume()
                 else:
                     cumTotal += bar.getPrice() * bar.getVolume()
                 cumVolume += bar.getVolume()
 
-            ret = cumTotal / float(cumVolume)
+            try :
+                ret = cumTotal / float(cumVolume)
+            except ZeroDivisionError:
+                if self.__useTypicalPrice:
+                    ret = bar.getTypicalPrice()  # if divide by zero error, return typical price itself, if useTypicalPrice is set to true
+                else :
+                    ret = bar.getPrice()  # Otherwise return the normal price
         return ret
 
 
